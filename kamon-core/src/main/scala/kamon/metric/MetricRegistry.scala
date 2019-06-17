@@ -47,7 +47,7 @@ class MetricRegistry(config: Config, scheduler: ScheduledExecutorService, clock:
   def counter(name: String, description: Option[String], unit: Option[MeasurementUnit], autoUpdateInterval: Option[Duration]):
       Metric.Counter = {
 
-    val metric = _metrics.atomicGetOrElseUpdate(name, _factory.counter(name, description, unit, autoUpdateInterval))
+    val metric = _metrics.getOrElseUpdate(name, _factory.counter(name, description, unit, autoUpdateInterval))
         .asInstanceOf[Metric.Counter]
 
     checkInstrumentType(name, Instrument.Type.Counter, metric)
@@ -63,7 +63,7 @@ class MetricRegistry(config: Config, scheduler: ScheduledExecutorService, clock:
   def gauge(name: String, description: Option[String], unit: Option[MeasurementUnit], autoUpdateInterval: Option[Duration]):
   Metric.Gauge = {
 
-    val metric = _metrics.atomicGetOrElseUpdate(name, _factory.gauge(name, description, unit, autoUpdateInterval))
+    val metric = _metrics.getOrElseUpdate(name, _factory.gauge(name, description, unit, autoUpdateInterval))
       .asInstanceOf[Metric.Gauge]
 
     checkInstrumentType(name, Instrument.Type.Gauge, metric)
@@ -79,7 +79,7 @@ class MetricRegistry(config: Config, scheduler: ScheduledExecutorService, clock:
   def histogram(name: String, description: Option[String], unit: Option[MeasurementUnit], dynamicRange: Option[DynamicRange],
     autoUpdateInterval: Option[Duration]): Metric.Histogram = {
 
-    val metric = _metrics.atomicGetOrElseUpdate(name, _factory.histogram(name, description, unit, dynamicRange,
+    val metric = _metrics.getOrElseUpdate(name, _factory.histogram(name, description, unit, dynamicRange,
       autoUpdateInterval)).asInstanceOf[Metric.Histogram]
 
     checkInstrumentType(name, Instrument.Type.Histogram, metric)
@@ -95,7 +95,7 @@ class MetricRegistry(config: Config, scheduler: ScheduledExecutorService, clock:
     */
   def timer(name: String, description: Option[String], dynamicRange: Option[DynamicRange], autoUpdateInterval: Option[Duration]): Metric.Timer = {
 
-    val metric = _metrics.atomicGetOrElseUpdate(name, _factory.timer(name, description, Some(MeasurementUnit.time.nanoseconds),
+    val metric = _metrics.getOrElseUpdate(name, _factory.timer(name, description, Some(MeasurementUnit.time.nanoseconds),
       dynamicRange, autoUpdateInterval)).asInstanceOf[Metric.Timer]
 
     checkInstrumentType(name, Instrument.Type.Timer, metric)
@@ -111,7 +111,7 @@ class MetricRegistry(config: Config, scheduler: ScheduledExecutorService, clock:
   def rangeSampler(name: String, description: Option[String], unit: Option[MeasurementUnit], dynamicRange: Option[DynamicRange],
     autoUpdateInterval: Option[Duration]): Metric.RangeSampler = {
 
-    val metric = _metrics.atomicGetOrElseUpdate(name, _factory.rangeSampler(name, description, unit, dynamicRange,
+    val metric = _metrics.getOrElseUpdate(name, _factory.rangeSampler(name, description, unit, dynamicRange,
       autoUpdateInterval)).asInstanceOf[Metric.RangeSampler]
 
     checkInstrumentType(name, Instrument.Type.RangeSampler, metric)

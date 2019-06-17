@@ -49,7 +49,7 @@ trait Utilities { self: Configuration =>
     * empty.
     */
   def filter(configKey: String): Filter =
-    _filters.atomicGetOrElseUpdate(configKey, Filter.from(configKey))
+    _filters.getOrElseUpdate(configKey, Filter.from(configKey))
 
   /**
     * Kamon's Clock implementation.
