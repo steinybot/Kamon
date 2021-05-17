@@ -23,12 +23,16 @@ import akka.testkit.{EventFilter, ImplicitSender, TestKit}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import kamon.Kamon
-import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OptionValues, WordSpecLike}
 import ContextTesting._
+import kamon.testkit.TestSpanReporter
+import kamon.trace.Span
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
 
-class AskPatternInstrumentationSpec extends TestKit(ActorSystem("AskPatternInstrumentationSpec")) with WordSpecLike with BeforeAndAfterAll with ImplicitSender {
+class AskPatternInstrumentationSpec extends TestKit(ActorSystem("AskPatternInstrumentationSpec")) with WordSpecLike with BeforeAndAfterAll
+  with ImplicitSender with Matchers with ScalaFutures with Eventually with OptionValues with TestSpanReporter {
 
   implicit lazy val ec = system.dispatcher
   implicit val askTimeout = Timeout(10 millis)
@@ -78,6 +82,37 @@ class AskPatternInstrumentationSpec extends TestKit(ActorSystem("AskPatternInstr
     }
   }
 
+  it should {
+    "create subsequent spans as siblings of the ask span" in {
+      val first = system.actorOf(Props[EchoActor], "traced-first")
+      val second = system.actorOf(Props[EchoActor], "traced-second")
+
+      val span = Kamon.spanBuilder("test").start()
+      Kamon.runWithSpan(span) {
+        val future = for {
+          _ <- first ? "Hello?"
+          _ <- second ? "Goodbye!"
+        } yield ()
+
+        future.isReadyWithin(2 seconds)
+
+        def nextSpan = {
+          eventually(timeout(20 seconds)) {
+            testSpanReporter.nextSpan().value
+          }
+        }
+
+        nextSpan.parentId shouldBe span.id
+        nextSpan.parentId shouldBe span.id
+      }
+    }
+  }
+
+  override protected def beforeAll(): Unit = {
+    enableFastSpanFlushing()
+    sampleAlways()
+  }
+
   override protected def afterAll(): Unit = shutdown()
 
   def setAskPatternTimeoutWarningMode(mode: String): Unit = {
@@ -89,5 +124,12 @@ class AskPatternInstrumentationSpec extends TestKit(ActorSystem("AskPatternInstr
 class NoReply extends Actor {
   def receive = {
     case _ =>
+  }
+}
+
+class EchoActor extends Actor {
+
+  override def receive: Receive = {
+    case message => sender ! s"Echo: ${message.toString}"
   }
 }
