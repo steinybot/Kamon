@@ -18,25 +18,29 @@ package kamon.testkit
 
 import java.security.cert.{Certificate, CertificateFactory}
 import java.security.{KeyStore, SecureRandom}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.{Http, HttpsConnectionContext}
+import akka.pattern._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import akka.http.scaladsl.model.StatusCodes.{BadRequest, InternalServerError, OK}
 import akka.http.scaladsl.model.headers.{Connection, RawHeader}
+import akka.http.scaladsl.model.ws.Message
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RequestContext, Route}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
+
 import javax.net.ssl.{KeyManagerFactory, SSLContext, SSLSocketFactory, TrustManagerFactory, X509TrustManager}
 import kamon.Kamon
 import kamon.instrumentation.akka.http.TracingDirectives
 import org.json4s.{DefaultFormats, native}
 import kamon.tag.Lookups.plain
 import kamon.trace.Trace
+
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
 
 trait TestWebServer extends TracingDirectives {
   implicit val serialization = native.Serialization
@@ -48,6 +52,8 @@ trait TestWebServer extends TracingDirectives {
 
     implicit val ec: ExecutionContext = system.dispatcher
     implicit val materializer = ActorMaterializer()
+
+    val webSocketActor = system.actorOf(WebSocketActor.props())
 
     val routes = logRequest("routing-request") {
       get {
@@ -169,6 +175,16 @@ trait TestWebServer extends TracingDirectives {
         } ~
         path("name-will-be-changed") {
           complete("OK")
+        } ~
+        path(webSocket) {
+          get {
+            extractWebSocketUpgrade { upgrade =>
+              complete(webSocketActor.ask("Gimme")(3.seconds).map {
+                case (source: Source[Message, Any]@unchecked, sink: Sink[Message, Any]@unchecked) =>
+                  upgrade.handleMessagesWithSinkSource(sink, source, None)
+              })
+            }
+          }
         }
       }
     }
@@ -226,6 +242,7 @@ trait TestWebServer extends TracingDirectives {
     val basicContext: String = "basic-context"
     val waitTen: String = "wait"
     val stream: String = "stream"
+    val webSocket: String = "websocket"
 
     implicit class Converter(endpoint: String) {
       implicit def withSlash: String = "/" + endpoint
